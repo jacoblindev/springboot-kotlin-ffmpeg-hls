@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://cdn.jsdelivr.net/hls.js/latest/hls.min.js"></script>
+</head>
+<body>
+選擇轉碼檔案： <input name="file" type="file" accept="video/*" onchange="upload(event)">
+<hr/>
+<video id="video" width="500" height="400" controls="controls"></video>
+<script>
+   		const video = document.getElementById('video');
+
+        function upload (e){
+            let files = e.target.files
+            if (!files) {
+                return
+            }
+
+            // TODO 轉碼配置這裡固定死了
+            var transCodeConfig = {
+            	poster: "00:00:00.001", // 擷取第1毫秒作為封面
+            	tsSeconds: 60,
+            	cutStart: "",
+            	cutEnd: ""
+            }
+
+            // 執行上傳
+            let formData = new FormData();
+            formData.append("file", files[0])
+            formData.append("config", new Blob([JSON.stringify(transCodeConfig)], {type: "application/json; charset=utf-8"}))
+
+            fetch('/video', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res =>  res.json())
+            .then(message => {
+            	if (message.success){
+            		// 設定封面
+            		video.poster = message.data.poster;
+
+            		// 渲染到播放器
+            		var hls = new Hls();
+        		    hls.loadSource(message.data.m3u8);
+        		    hls.attachMedia(video);
+            	} else {
+            		alert("轉碼異常，詳情檢視控制檯");
+            		console.log(message.message);
+            	}
+            })
+            .catch(err => {
+            	alert("轉碼異常，詳情檢視控制檯");
+                throw err
+            })
+        }
+
+</script>
+</body>
+</html>

@@ -47,13 +47,14 @@ class VideoController {
             // 暫存影片到暫存資料夾
             tempFile?.let { video.transferTo(it) }
             // 刪除字尾
-            title?.substring(0, title.lastIndexOf("."))
+            val tempTitle: String? = title?.substring(0, title.lastIndexOf("."))
+            LOG.info(tempTitle)
             // 按照日期生成子目錄 /日期/上傳檔名
             val today: String = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
-            val targetFolder: Path? = videoFolder?.let { Paths.get(it, today, title) }
+            val targetFolder: Path? = videoFolder?.let { Paths.get(it, today, tempTitle) }
             // 嘗試建立影片目錄
             if (targetFolder != null) {
-                Files.createDirectory(targetFolder)
+                Files.createDirectories(targetFolder)
             }
             LOG.info("建立資料夾目錄：{}", targetFolder)
             // 執行轉碼操作
@@ -68,7 +69,7 @@ class VideoController {
             }
 
             val videoInfo: VideoInfo? =
-                title?.let { VideoInfo(it, "/${today}/${title}/index.m3u8", "/${today}/${title}/poster.jpg") }
+                title?.let { VideoInfo(it, "/${today}/${tempTitle}/index.m3u8", "/${today}/${tempTitle}/poster.jpg") }
 
             LOG.info(videoInfo.toString())
 

@@ -1,6 +1,7 @@
 package videohlsdemo.utility
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.google.gson.Gson
 import org.apache.commons.codec.binary.Hex
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -16,7 +17,6 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.security.NoSuchAlgorithmException
 import javax.crypto.KeyGenerator
-import kotlin.concurrent.thread
 
 class FFmpegUtils {
     companion object {
@@ -64,7 +64,7 @@ class FFmpegUtils {
                 )
                 return keyInfo
             } catch (e: IOException) {
-                throw IOException("File path is invalid")
+                throw IOException("File path is invalid : [genKeyInfo]")
             }
         }
 
@@ -72,6 +72,7 @@ class FFmpegUtils {
          * 指定的目錄下生成 master index.m3u8 檔案
          */
         private fun genIndex(file: String, indexPath: String, bandWidth: String) {
+            LOG.info("GenIndex: file = {}, indexPath = {}, bandWidth = {}", file, indexPath, bandWidth)
             try {
                 val strBuilder: StringBuilder = StringBuilder()
                 strBuilder.append("#EXTM3U").append(LINE_SEPARATOR)
@@ -84,7 +85,7 @@ class FFmpegUtils {
                     StandardOpenOption.TRUNCATE_EXISTING
                 )
             } catch (e: IOException) {
-                throw IOException("File path is invalid")
+                throw IOException("File path is invalid : [genIndex]")
             }
         }
 
@@ -92,6 +93,7 @@ class FFmpegUtils {
          * 轉碼影片至 M3U8 檔
          */
         fun transcodeToM3U8(source: String, destFolder: String, config: TranscodeConfig) {
+            LOG.info("M3U8轉檔開始： source = {}, destFolder = {}, config = {}", source, destFolder, config)
             // 判斷源影片是否存在
             if (!Files.exists(Paths.get(source))) throw IllegalArgumentException("檔案不存在：$source")
             try {
@@ -119,29 +121,34 @@ class FFmpegUtils {
                     "%06d.ts",                  // ts 切片檔名稱
                     "index.m3u8",               // 生成 M3U8 檔案
                 )
-                val process: Process = ProcessBuilder().command(commands).directory(workDir.toFile()).start()
+                val process: Process =
+                    ProcessBuilder().command(commands)
+                        .directory(workDir.toFile())
+                        .redirectErrorStream(true)
+                        .inheritIO()
+                        .start()
                 // 讀取程序標準輸出
-                thread(start = true) {
-                    try {
-                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-                        val line: String? = bufferedReader.readLine()
-                        while (line != null) {
-                            LOG.info(line)
-                        }
-                    } catch (_: IOException) {
-                    }
-                }
+//                thread(start = true) {
+//                    try {
+//                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
+//                        val line: String? = bufferedReader.readLine()
+//                        while (line != null) {
+//                            LOG.info(line)
+//                        }
+//                    } catch (_: IOException) {
+//                    }
+//                }
                 // 讀取程序異常輸出
-                thread(start = true) {
-                    try {
-                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
-                        val line: String? = bufferedReader.readLine()
-                        while (line != null) {
-                            LOG.error(line)
-                        }
-                    } catch (_: IOException) {
-                    }
-                }
+//                thread(start = true) {
+//                    try {
+//                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
+//                        val line: String? = bufferedReader.readLine()
+//                        while (line != null) {
+//                            LOG.error(line)
+//                        }
+//                    } catch (_: IOException) {
+//                    }
+//                }
                 // 阻塞直到任務結束
                 if (process.waitFor() != 0) throw RuntimeException("影片切片異常")
                 // 切出封面
@@ -149,16 +156,16 @@ class FFmpegUtils {
                 // 獲取影片資訊
                 val mediaInfo: MediaInfo = getMediaInfo(source) ?: throw RuntimeException("獲取媒體資訊異常")
                 // 生成 index.m3u8 檔案
-                genIndex("/${destFolder}/index.m3u8", "ts/index.m3u8", mediaInfo.format.bitRate)
+//                genIndex("/${destFolder}/index.m3u8", "ts/index.m3u8", mediaInfo.format.bitRate)
                 // 刪除 keyInfo 檔案
                 Files.delete(keyInfo)
             } catch (e: IOException) {
-                throw IOException("File path is invalid")
+                throw IOException("File path is invalid : [transcodeToM3U8]")
             }
         }
 
         /**
-         * 獲取影片檔案的媒體資訊
+         * 獲取影片檔案的媒體資訊 TODO: 這裡會出錯？
          */
         private fun getMediaInfo(source: String): MediaInfo? {
             val commands: List<String> = listOf(
@@ -170,18 +177,23 @@ class FFmpegUtils {
                 "-print_format",
                 "json",
             )
-            val process: Process = ProcessBuilder(commands).start()
+            val process: Process = ProcessBuilder(commands).redirectErrorStream(true).inheritIO().start()
             var mediaInfo: MediaInfo? = null
+//            BufferedReader(InputStreamReader(process.inputStream)).use {
+//                val mapper = jacksonObjectMapper()
+//                mediaInfo = mapper.readValue(it, MediaInfo::class.java)
+//            }
             try {
-                val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-                val mapper = jacksonObjectMapper()
-                mediaInfo = mapper.readValue(bufferedReader, MediaInfo::class.java)
-
+                val bufferedReader = BufferedReader(InputStreamReader(process.inputStream))
+//                val mapper = jacksonObjectMapper()
+//                mediaInfo = mapper.readValue(bufferedReader, MediaInfo::class.java)
+                mediaInfo = Gson().fromJson(bufferedReader, MediaInfo::class.java)
+                LOG.info(mediaInfo.toString())
             } catch (e: IOException) {
                 println(e.stackTrace)
             }
-            if (process.waitFor() != 0) return null
-
+//            if (process.waitFor() != 0) return null
+            process.waitFor()
             return mediaInfo
         }
 
@@ -204,29 +216,29 @@ class FFmpegUtils {
                 "image2",
                 file,
             )
-            val process: Process = ProcessBuilder(commands).start()
+            val process: Process = ProcessBuilder(commands).redirectErrorStream(true).inheritIO().start()
             // 讀取程序標準輸出
-            thread(start = true) {
-                try {
-                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-                    val line: String? = bufferedReader.readLine()
-                    while (line != null) {
-                        LOG.info(line)
-                    }
-                } catch (_: IOException) {
-                }
-            }
+//            thread(start = true) {
+//                try {
+//                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
+//                    val line: String? = bufferedReader.readLine()
+//                    while (line != null) {
+//                        LOG.info(line)
+//                    }
+//                } catch (_: IOException) {
+//                }
+//            }
             // 讀取程序異常輸出
-            thread(start = true) {
-                try {
-                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
-                    val line: String? = bufferedReader.readLine()
-                    while (line != null) {
-                        LOG.error(line)
-                    }
-                } catch (_: IOException) {
-                }
-            }
+//            thread(start = true) {
+//                try {
+//                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
+//                    val line: String? = bufferedReader.readLine()
+//                    while (line != null) {
+//                        LOG.error(line)
+//                    }
+//                } catch (_: IOException) {
+//                }
+//            }
             return process.waitFor() == 0
         }
 

@@ -1,6 +1,5 @@
 package videohlsdemo.utility
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.gson.Gson
 import org.apache.commons.codec.binary.Hex
 import org.slf4j.Logger
@@ -43,9 +42,9 @@ class FFmpegUtils {
          */
         private fun genKeyInfo(folder: String): Path {
             try {
-                // AES 金鑰
+                // AES key
                 val aesKey: ByteArray = genAesKey()
-                // AES 向量(vector) TODO: 是否值雜湊金鑰?
+                // AES initialization vector
                 val iv: String = Hex.encodeHexString(genAesKey())
                 // key 檔案寫入
                 val keyFile = Paths.get(folder, "key")
@@ -90,7 +89,9 @@ class FFmpegUtils {
         }
 
         /**
-         * 轉碼影片至 M3U8 檔
+         *  Transcode video into M3U8 format with FFmpeg
+         *  Official Docs: https://ffmpeg.org/
+         *  Ref: https://alfg.dev/ffmpeg-commander/
          */
         fun transcodeToM3U8(source: String, destFolder: String, config: TranscodeConfig) {
             LOG.info("M3U8轉檔開始： source = {}, destFolder = {}, config = {}", source, destFolder, config)
@@ -121,34 +122,18 @@ class FFmpegUtils {
                     "%06d.ts",                  // ts 切片檔名稱
                     "index.m3u8",               // 生成 M3U8 檔案
                 )
+
+                /**
+                 *  Create a subprocess to execute the shell command for Video transcode with FFmpeg.
+                 *  Ref: https://www.baeldung.com/java-lang-processbuilder-api
+                 */
                 val process: Process =
                     ProcessBuilder().command(commands)
                         .directory(workDir.toFile())
                         .redirectErrorStream(true)
                         .inheritIO()
                         .start()
-                // 讀取程序標準輸出
-//                thread(start = true) {
-//                    try {
-//                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-//                        val line: String? = bufferedReader.readLine()
-//                        while (line != null) {
-//                            LOG.info(line)
-//                        }
-//                    } catch (_: IOException) {
-//                    }
-//                }
-                // 讀取程序異常輸出
-//                thread(start = true) {
-//                    try {
-//                        val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
-//                        val line: String? = bufferedReader.readLine()
-//                        while (line != null) {
-//                            LOG.error(line)
-//                        }
-//                    } catch (_: IOException) {
-//                    }
-//                }
+
                 // 阻塞直到任務結束
                 if (process.waitFor() != 0) throw RuntimeException("影片切片異常")
                 // 切出封面
@@ -156,7 +141,7 @@ class FFmpegUtils {
                 // 獲取影片資訊
                 val mediaInfo: MediaInfo = getMediaInfo(source) ?: throw RuntimeException("獲取媒體資訊異常")
                 // 生成 index.m3u8 檔案
-//                genIndex("/${destFolder}/index.m3u8", "ts/index.m3u8", mediaInfo.format.bitRate)
+                genIndex("/${destFolder}/index.m3u8", "ts/index.m3u8", mediaInfo.format.bit_rate)
                 // 刪除 keyInfo 檔案
                 Files.delete(keyInfo)
             } catch (e: IOException) {
@@ -177,23 +162,14 @@ class FFmpegUtils {
                 "-print_format",
                 "json",
             )
-            val process: Process = ProcessBuilder(commands).redirectErrorStream(true).inheritIO().start()
+            val process: Process = ProcessBuilder(commands).start()
             var mediaInfo: MediaInfo? = null
-//            BufferedReader(InputStreamReader(process.inputStream)).use {
-//                val mapper = jacksonObjectMapper()
-//                mediaInfo = mapper.readValue(it, MediaInfo::class.java)
-//            }
-            try {
-                val bufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-//                val mapper = jacksonObjectMapper()
-//                mediaInfo = mapper.readValue(bufferedReader, MediaInfo::class.java)
-                mediaInfo = Gson().fromJson(bufferedReader, MediaInfo::class.java)
-                LOG.info(mediaInfo.toString())
-            } catch (e: IOException) {
-                println(e.stackTrace)
+            BufferedReader(InputStreamReader(process.inputStream)).use {
+                mediaInfo = Gson().fromJson(it, MediaInfo::class.java)
             }
-//            if (process.waitFor() != 0) return null
-            process.waitFor()
+
+            if (process.waitFor() != 0) return null
+
             return mediaInfo
         }
 
@@ -217,28 +193,7 @@ class FFmpegUtils {
                 file,
             )
             val process: Process = ProcessBuilder(commands).redirectErrorStream(true).inheritIO().start()
-            // 讀取程序標準輸出
-//            thread(start = true) {
-//                try {
-//                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.inputStream))
-//                    val line: String? = bufferedReader.readLine()
-//                    while (line != null) {
-//                        LOG.info(line)
-//                    }
-//                } catch (_: IOException) {
-//                }
-//            }
-            // 讀取程序異常輸出
-//            thread(start = true) {
-//                try {
-//                    val bufferedReader: BufferedReader = BufferedReader(InputStreamReader(process.errorStream))
-//                    val line: String? = bufferedReader.readLine()
-//                    while (line != null) {
-//                        LOG.error(line)
-//                    }
-//                } catch (_: IOException) {
-//                }
-//            }
+
             return process.waitFor() == 0
         }
 

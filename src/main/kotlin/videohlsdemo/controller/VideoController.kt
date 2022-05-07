@@ -58,8 +58,6 @@ class VideoController {
                 FFmpegUtils.transcodeToM3U8(tempFile.toString(), targetFolder.toString())
             } catch (e: Exception) {
                 LOG.error("轉碼異常：{}", e.message)
-//                val rs = ResponseDTO(success = false)
-//                rs.msg = e.message
                 val result: MutableMap<String, Any> = HashMap()
                 result["success"] = true
                 result["msg"] = e.message.toString()

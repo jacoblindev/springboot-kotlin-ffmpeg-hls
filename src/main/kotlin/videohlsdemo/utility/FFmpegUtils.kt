@@ -150,7 +150,7 @@ class FFmpegUtils {
         }
 
         /**
-         * 獲取影片檔案的媒體資訊 TODO: 這裡會出錯？
+         * 獲取影片檔案的媒體資訊
          */
         private fun getMediaInfo(source: String): MediaInfo? {
             val commands: List<String> = listOf(

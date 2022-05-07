@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
-import videohlsdemo.model.ResponseDTO
-import videohlsdemo.model.TranscodeConfig
 import videohlsdemo.utility.FFmpegUtils
 import java.io.IOException
 import java.nio.file.Files
@@ -33,15 +31,14 @@ class VideoController {
 
     @PostMapping
     fun upload(
-        @RequestPart(name = "file", required = true) video: MultipartFile,
-        @RequestPart(name = "config", required = true) transcodeConfig: TranscodeConfig,
+        @RequestPart(name = "file", required = true) video: MultipartFile
     ): ResponseEntity<MutableMap<String, Any>> {
         LOG.info("檔案資訊：title={}, size={}", video.originalFilename, video.size)
-        LOG.info("轉碼配置：{}", transcodeConfig)
+//        LOG.info("轉碼配置：{}", transcodeConfig)
         // 原始檔名 - 影片標題
         val title: String = video.originalFilename ?: "TempFile"
         LOG.info("原始檔名：{}", title)
-        val tempFile: Path = tempDir.resolve(title!!)
+        val tempFile: Path = tempDir.resolve(title)
         LOG.info("臨時檔案夾：{}", tempFile.toString())
         try {
             // 暫存影片到暫存資料夾
@@ -58,7 +55,7 @@ class VideoController {
             // 執行轉碼操作
             LOG.info("開始轉碼")
             try {
-                FFmpegUtils.transcodeToM3U8(tempFile.toString(), targetFolder.toString(), transcodeConfig)
+                FFmpegUtils.transcodeToM3U8(tempFile.toString(), targetFolder.toString())
             } catch (e: Exception) {
                 LOG.error("轉碼異常：{}", e.message)
 //                val rs = ResponseDTO(success = false)
@@ -68,13 +65,6 @@ class VideoController {
                 result["msg"] = e.message.toString()
                 return ResponseEntity(result, HttpStatus.INTERNAL_SERVER_ERROR)
             }
-//            val videoInfo: VideoInfo? =
-//                VideoInfo(title, "/${today}/${tempTitle}/index.m3u8", "/${today}/${tempTitle}/poster.jpg")
-//            LOG.info(videoInfo.toString())
-//            val rs = ResponseDTO(success = true)
-//            rs.msg = "轉碼成功"
-//            rs.data = videoInfo.toString()
-            // 封裝結果
 
             // 封裝結果
             val videoInfo: MutableMap<String, Any> = HashMap()

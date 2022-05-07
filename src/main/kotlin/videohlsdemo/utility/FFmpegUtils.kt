@@ -93,8 +93,8 @@ class FFmpegUtils {
          *  Official Docs: https://ffmpeg.org/
          *  Ref: https://alfg.dev/ffmpeg-commander/
          */
-        fun transcodeToM3U8(source: String, destFolder: String, config: TranscodeConfig) {
-            LOG.info("M3U8轉檔開始： source = {}, destFolder = {}, config = {}", source, destFolder, config)
+        fun transcodeToM3U8(source: String, destFolder: String) {
+            LOG.info("M3U8轉檔開始： source = {}, destFolder = {}", source, destFolder)
             // 判斷源影片是否存在
             if (!Files.exists(Paths.get(source))) throw IllegalArgumentException("檔案不存在：$source")
             try {
@@ -115,7 +115,7 @@ class FFmpegUtils {
                     "-hls_key_info_file",
                     keyInfo.toString(),         // 指定金鑰檔案路徑
                     "-hls_time",
-                    config.tsSeconds,           // ts 切片大小
+                    "60",           // ts 切片大小
                     "-hls_playlist_type",
                     "vod",                      // 點播模式
                     "-hls_segment_filename",
@@ -137,7 +137,7 @@ class FFmpegUtils {
                 // 阻塞直到任務結束
                 if (process.waitFor() != 0) throw RuntimeException("影片切片異常")
                 // 切出封面
-                if (!screenShots(source, "/${destFolder}/poster.jpg", config.poster)) throw RuntimeException("封面擷取異常")
+                if (!screenShots(source, "/${destFolder}/poster.jpg")) throw RuntimeException("封面擷取異常")
                 // 獲取影片資訊
                 val mediaInfo: MediaInfo = getMediaInfo(source) ?: throw RuntimeException("獲取媒體資訊異常")
                 // 生成 index.m3u8 檔案
@@ -176,13 +176,13 @@ class FFmpegUtils {
         /**
          * 擷取影片的指定時間幀，生成圖片檔案
          */
-        private fun screenShots(source: String, file: String, time: String): Boolean {
+        private fun screenShots(source: String, file: String): Boolean {
             val commands: List<String> = listOf(
                 "ffmpeg",
                 "-i",
                 source,
                 "-ss",
-                time,
+                "00:00:00.001", // 擷取第1毫秒作為封面
                 "-y",
                 "-q:v",
                 "1",

@@ -18,18 +18,9 @@
                 return
             }
 
-            // TODO 轉碼配置這裡固定死了
-            var transCodeConfig = {
-            	poster: "00:00:00.001", // 擷取第1毫秒作為封面
-            	tsSeconds: 60,
-            	cutStart: "",
-            	cutEnd: ""
-            }
-
             // 執行上傳
             let formData = new FormData();
             formData.append("file", files[0])
-            formData.append("config", new Blob([JSON.stringify(transCodeConfig)], {type: "application/json; charset=utf-8"}))
 
             fetch('/video', {
                 method: 'POST',
@@ -38,8 +29,9 @@
             .then(res =>  res.json())
             .then(message => {
             	if (message.success){
-            		// 設定封面
+            		// 設定封面 與 標題
             		video.poster = message.data.poster;
+            		video.title = message.data.title;
 
             		// 渲染到播放器
             		var hls = new Hls();

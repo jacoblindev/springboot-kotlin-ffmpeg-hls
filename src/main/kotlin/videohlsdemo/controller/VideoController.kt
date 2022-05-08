@@ -2,14 +2,19 @@ package videohlsdemo.controller
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import videohlsdemo.model.Video
+import videohlsdemo.repository.VideoRepository
 import videohlsdemo.utility.FFmpegUtils
 import java.io.IOException
 import java.nio.file.Files
@@ -17,10 +22,12 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Optional
+import javax.websocket.server.PathParam
 
 @RestController
 @RequestMapping("/video")
-class VideoController {
+class VideoController(@Autowired val videoRepo: VideoRepository) {
     companion object {
         private val LOG: Logger = LoggerFactory.getLogger(VideoController::class.java)
     }
@@ -28,6 +35,18 @@ class VideoController {
     @Value("\${app.video-folder}")
     lateinit var videoFolder: String
     private val tempDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
+
+    @GetMapping("/list")
+    fun findAll(): ResponseEntity<List<Video>> {
+        val vList: List<Video> = videoRepo.findAll()
+        return ResponseEntity(vList, HttpStatus.OK)
+    }
+
+    @GetMapping("/{id}")
+    fun findById(@PathVariable id: String): ResponseEntity<Optional<Video>> {
+        val v: Optional<Video> = videoRepo.findById(id)
+        return ResponseEntity(v, HttpStatus.OK)
+    }
 
     @PostMapping
     fun upload(
@@ -69,6 +88,13 @@ class VideoController {
             videoInfo["title"] = title
             videoInfo["m3u8"] = java.lang.String.join("/", "", today, tempTitle, "index.m3u8")
             videoInfo["poster"] = java.lang.String.join("/", "", today, tempTitle, "poster.jpg")
+
+            val v: Video = Video(
+                title = title,
+                poster = "/${today}/${tempTitle}/poster.jpg",
+                playlist = "/${today}/${tempTitle}/index.m3u8",
+            )
+            videoRepo.save(v)
 
             LOG.info(videoInfo.toString())
 

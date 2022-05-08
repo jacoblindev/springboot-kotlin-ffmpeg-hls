@@ -69,6 +69,7 @@ class FFmpegUtils {
 
         /**
          * 指定的目錄下生成 master index.m3u8 檔案
+         * Ref: https://opensource.com/article/17/6/ffmpeg-convert-media-file-formats
          */
         private fun genIndex(file: String, indexPath: String, bandWidth: String) {
             LOG.info("GenIndex: file = {}, indexPath = {}, bandWidth = {}", file, indexPath, bandWidth)
@@ -106,12 +107,13 @@ class FFmpegUtils {
                 // 建構命令
                 val commands: List<String> = listOf(
                     "ffmpeg",
-                    "-i",
+                    "-i",                       // Input
                     source,                     // 原始檔
-                    "-c:v",
+                    "-c:v",                     // Select an encoder (when used before an output file) or a decoder (when used before an input file) for one or more streams.
                     "libx264",                  // 影片編碼為 H264
                     "-c:a",
                     "copy",                     // 音訊直接 copy
+                    // https://ffmpeg.org/ffmpeg-formats.html#hls-2
                     "-hls_key_info_file",
                     keyInfo.toString(),         // 指定金鑰檔案路徑
                     "-hls_time",

@@ -5,7 +5,6 @@ import org.apache.commons.codec.binary.Hex
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import videohlsdemo.model.MediaInfo
-import videohlsdemo.model.TranscodeConfig
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -23,6 +22,56 @@ class FFmpegUtils {
 
         // 取得該系統平台換行符號
         private val LINE_SEPARATOR: String = System.getProperty("line.separator")
+
+        fun audioTranscodeToM3U8(source: String, destFolder: String) {
+            LOG.info("M3U8轉檔開始： source = $source, destFolder = $destFolder")
+            // 判斷源影片是否存在
+            if (!Files.exists(Paths.get(source))) throw IllegalArgumentException("檔案不存在：$source")
+            try {
+                // 建立工作目錄
+                val workDir: Path = Paths.get(destFolder)
+                // 檢查工作目錄是否已存在
+//                if (!Files.exists(Paths.get(workDir.toUri()))) {
+//                    Files.createDirectory(workDir)
+//                } else {
+//                    throw IllegalArgumentException("檔案已存在：${workDir.toUri()}")
+//                }
+
+                // 在工作目錄生成KeyInfo檔案
+                val keyInfo: Path = genKeyInfo(workDir.toString())
+                // 建構命令
+                val commands: List<String> = listOf(
+                    "ffmpeg",
+                    "-i",                       // Input
+                    source,                     // 原始檔
+                    "-c:a",
+                    "copy",                     // 音訊直接 copy
+                    "-hls_key_info_file",
+                    keyInfo.toString(),         // 指定金鑰檔案路徑
+                    "-hls_time",
+                    "20",           // ts 切片大小
+                    "-hls_playlist_type",
+                    "vod",                      // 點播模式
+                    "-hls_segment_filename",
+                    "%03d.ts",                  // ts 切片檔名稱
+                    "index.m3u8",               // 生成 M3U8 檔案
+                )
+
+                val process: Process =
+                    ProcessBuilder().command(commands)
+                        .directory(workDir.toFile())
+                        .redirectErrorStream(true)
+                        .inheritIO()
+                        .start()
+
+                // 阻塞直到任務結束
+                if (process.waitFor() != 0) throw RuntimeException("影片切片異常")
+                // 刪除 keyInfo 檔案
+                Files.delete(keyInfo)
+            } catch (e: IOException) {
+                throw IOException("File path is invalid : [audioTranscodeToM3U8]")
+            }
+        }
 
         /**
          * 隨機生成16位元的 AES KEY
@@ -71,13 +120,13 @@ class FFmpegUtils {
          * 指定的目錄下生成 master index.m3u8 檔案
          * Ref: https://opensource.com/article/17/6/ffmpeg-convert-media-file-formats
          */
-        private fun genIndex(file: String, indexPath: String, bandWidth: String) {
-            LOG.info("GenIndex: file = {}, indexPath = {}, bandWidth = {}", file, indexPath, bandWidth)
+        private fun genIndex(file: String, bandWidth: String) {
+            LOG.info("GenIndex: file = $file, bandWidth = $bandWidth")
             try {
                 val strBuilder: StringBuilder = StringBuilder()
                 strBuilder.append("#EXTM3U").append(LINE_SEPARATOR)
                 strBuilder.append("#EXT-X-STREAM-INF:BANDWIDTH=$bandWidth").append(LINE_SEPARATOR)
-                strBuilder.append(indexPath)
+                strBuilder.append("ts/index.m3u8")
                 Files.write(
                     Paths.get(file),
                     strBuilder.toString().toByteArray(StandardCharsets.UTF_8),
@@ -91,8 +140,10 @@ class FFmpegUtils {
 
         /**
          *  Transcode video into M3U8 format with FFmpeg
-         *  Official Docs: https://ffmpeg.org/
-         *  Ref: https://alfg.dev/ffmpeg-commander/
+         *  Official Docs:
+         *  https://ffmpeg.org/
+         *  https://alfg.dev/ffmpeg-commander/
+         *  https://www.martin-riedl.de/2020/04/17/using-ffmpeg-as-a-hls-streaming-server-overview/
          */
         fun transcodeToM3U8(source: String, destFolder: String) {
             LOG.info("M3U8轉檔開始： source = {}, destFolder = {}", source, destFolder)
@@ -143,7 +194,7 @@ class FFmpegUtils {
                 // 獲取影片資訊
                 val mediaInfo: MediaInfo = getMediaInfo(source) ?: throw RuntimeException("獲取媒體資訊異常")
                 // 生成 index.m3u8 檔案
-                genIndex("/${destFolder}/index.m3u8", "ts/index.m3u8", mediaInfo.format.bit_rate)
+                genIndex("/${destFolder}/index.m3u8", mediaInfo.format.bit_rate)
                 // 刪除 keyInfo 檔案
                 Files.delete(keyInfo)
             } catch (e: IOException) {
@@ -165,7 +216,7 @@ class FFmpegUtils {
                 "json",
             )
             val process: Process = ProcessBuilder(commands).start()
-            var mediaInfo: MediaInfo? = null
+            var mediaInfo: MediaInfo?
             BufferedReader(InputStreamReader(process.inputStream)).use {
                 mediaInfo = Gson().fromJson(it, MediaInfo::class.java)
             }

@@ -6,13 +6,16 @@
     <script src="https://cdn.jsdelivr.net/hls.js/latest/hls.min.js"></script>
 </head>
 <body>
-選擇轉碼檔案： <input name="file" type="file" accept="video/*" onchange="upload(event)">
+選擇轉碼檔案(Video)： <input name="file" type="file" accept="video/*" onchange="uploadVideo(event)">
+選擇轉碼檔案(Audio)： <input name="file" type="file" accept="audio/*" onchange="uploadAudio(event)">
 <hr/>
 <video id="video" width="500" height="400" controls="controls"></video>
+<audio id="audio" controls="controls"></audio>
 <script>
    		const video = document.getElementById('video');
+   		const audio = document.getElementById('audio');
 
-        function upload (e){
+        function uploadVideo(e){
             let files = e.target.files
             if (!files) {
                 return
@@ -37,6 +40,41 @@
             		var hls = new Hls();
         		    hls.loadSource(message.data.m3u8);
         		    hls.attachMedia(video);
+            	} else {
+            		alert("轉碼異常，詳情檢視控制檯");
+            		console.log(message.message);
+            	}
+            })
+            .catch(err => {
+            	alert("轉碼異常，詳情檢視控制檯");
+                throw err
+            })
+        }
+
+        function uploadAudio(e){
+            let files = e.target.files
+            if (!files) {
+                return
+            }
+
+            // 執行上傳
+            let formData = new FormData();
+            formData.append("file", files[0])
+
+            fetch('/audio', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res =>  res.json())
+            .then(message => {
+            	if (message.success){
+            		// 設定封面 與 標題
+            		video.title = message.data.title;
+
+            		// 渲染到播放器
+            		var hls = new Hls();
+        		    hls.loadSource(message.data.m3u8);
+        		    hls.attachMedia(audio);
             	} else {
             		alert("轉碼異常，詳情檢視控制檯");
             		console.log(message.message);

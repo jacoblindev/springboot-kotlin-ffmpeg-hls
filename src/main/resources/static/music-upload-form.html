@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Music Upload Form</title>
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+</head>
+<body>
+<div class="container">
+    <div class="card border-dark m-3">
+        <h5 class="card-header bg-dark text-light">Music Upload</h5>
+        <div class="card-body">
+            <form onsubmit="uploadMusic(event)">
+                <div class="mb-3">
+                    <label for="music-name" class="form-label">Music Name:</label>
+                    <input id="music-name" class="form-control" name="musicName" type="text" placeholder="Awesome Song" />
+                </div>
+                <div class="mb-3">
+                    <label for="music-author" class="form-label">Music Author:</label>
+                    <input id="music-author" class="form-control" name="musicAuthor" type="text" placeholder="John Doe" />
+                </div>
+                <div class="mb-3">
+                    <label for="music-type" class="form-label">Music Type:</label>
+                    <input id="music-type" class="form-control" name="musicType" type="text" placeholder="indie" />
+                </div>
+                <div class="mb-3">
+                    <label for="music-detail" class="form-label">Music Detail:</label>
+                    <textarea id="music-detail" class="form-control" name="musicDetail" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="music-file" class="form-label">Music File:</label>
+                    <input class="form-control" type="file" id="music-file" name="musicFile" accept="audio/*">
+                </div>
+                <button type="submit" class="btn btn-primary">SUBMIT</button>
+            </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+            crossorigin="anonymous"></script>
+    <script>
+        function uploadMusic(e) {
+            e.preventDefault();
+
+            let musicName = e.target.musicName.value;
+            let musicAuthor = e.target.musicAuthor.value;
+            let musicType = e.target.musicType.value;
+            let musicDetail = e.target.musicDetail.value;
+            let musicFile = e.target.musicFile.files;
+
+            let formData = new FormData();
+            formData.append("musicName", musicName);
+            formData.append("musicAuthor", musicAuthor);
+            formData.append("musicType", musicType);
+            formData.append("musicDetail", musicDetail);
+            formData.append("musicFile", musicFile[0]);
+
+            fetch('/audio/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res =>  res.json())
+            .then(data => {
+                console.log(data.message);
+            })
+            .catch(err => {
+            	alert("轉碼異常，詳情檢視控制檯");
+                throw err
+            })
+        }
+    </script>
+</body>
+</html>

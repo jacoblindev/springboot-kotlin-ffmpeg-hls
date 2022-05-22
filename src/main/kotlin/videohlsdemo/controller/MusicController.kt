@@ -10,32 +10,47 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import videohlsdemo.model.UploadReq
+import videohlsdemo.model.UploadRes
 import videohlsdemo.utility.FFmpegUtils
 import java.io.IOException
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+
 @RestController
 @RequestMapping("/audio")
-class AudioController {
+class MusicController {
     companion object {
-        private val LOG: Logger = LoggerFactory.getLogger(AudioController::class.java)
+        private val LOG: Logger = LoggerFactory.getLogger(MusicController::class.java)
     }
 
     @Value("\${app.audio-folder}")
     lateinit var audioFolder: String
 
+    @Value("\${server.port}")
+    lateinit var serverPort: String
+
     private val tempDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
+
+    @PostMapping("/upload")
+    fun musicUpload(formData: UploadReq): ResponseEntity<UploadRes> {
+        LOG.info("[Request]: ${formData.musicName}, ${formData.musicAuthor}, ${formData.musicType}, ${formData.musicDetail}")
+        LOG.info("[檔案資訊]：title={}, size={}", formData.musicFile.originalFilename, formData.musicFile.size)
+        val res = UploadRes("Music")
+        return ResponseEntity.ok().body(res)
+    }
 
     @PostMapping
     fun upload(
         @RequestPart(name = "file", required = true) audio: MultipartFile
     ): ResponseEntity<MutableMap<String, Any>> {
         LOG.info("檔案資訊：title={}, size={}", audio.originalFilename, audio.size)
-//        LOG.info("轉碼配置：{}", transcodeConfig)
         // 原始檔名 - 影片標題
         val title: String = audio.originalFilename ?: "TempFile"
         LOG.info("原始檔名：{}", title)
@@ -75,6 +90,14 @@ class AudioController {
             val result: MutableMap<String, Any> = HashMap()
             result["success"] = true
             result["data"] = audioInfo
+
+            val ipAddr: String
+            try {
+                ipAddr = InetAddress.getLocalHost().hostAddress
+                LOG.info("[HOSTNAME]: $ipAddr:$serverPort")
+            } catch (e: UnknownHostException) {
+                LOG.error("Unknown Host???")
+            }
 
             LOG.info(result.toString())
             return ResponseEntity(result, HttpStatus.OK)

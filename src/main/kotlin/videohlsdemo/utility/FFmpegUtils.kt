@@ -23,27 +23,18 @@ class FFmpegUtils {
         // 取得該系統平台換行符號
         private val LINE_SEPARATOR: String = System.getProperty("line.separator")
 
-        fun audioTranscodeToM3U8(source: String, destFolder: String) {
-            LOG.info("M3U8轉檔開始： source = $source, destFolder = $destFolder")
-            // 判斷源影片是否存在
-            if (!Files.exists(Paths.get(source))) throw IllegalArgumentException("檔案不存在：$source")
+        fun audioTranscodeToM3U8(source: Path, destDir: Path) {
+            LOG.info("[M3U8轉檔開始]： source = $source, destFolder = $destDir")
+            // 判斷源使檔案是否存在
+            if (!Files.exists(source)) throw IllegalArgumentException("[原始檔案不存在]：$source")
             try {
-                // 建立工作目錄
-                val workDir: Path = Paths.get(destFolder)
-                // 檢查工作目錄是否已存在
-//                if (!Files.exists(Paths.get(workDir.toUri()))) {
-//                    Files.createDirectory(workDir)
-//                } else {
-//                    throw IllegalArgumentException("檔案已存在：${workDir.toUri()}")
-//                }
-
                 // 在工作目錄生成KeyInfo檔案
-                val keyInfo: Path = genKeyInfo(workDir.toString())
+                val keyInfo: Path = genKeyInfo(destDir.toString())
                 // 建構命令
                 val commands: List<String> = listOf(
                     "ffmpeg",
                     "-i",                       // Input
-                    source,                     // 原始檔
+                    source.toString(),          // 原始檔
                     "-c:a",
                     "copy",                     // 音訊直接 copy
                     "-hls_key_info_file",
@@ -59,17 +50,17 @@ class FFmpegUtils {
 
                 val process: Process =
                     ProcessBuilder().command(commands)
-                        .directory(workDir.toFile())
+                        .directory(destDir.toFile())
                         .redirectErrorStream(true)
                         .inheritIO()
                         .start()
 
                 // 阻塞直到任務結束
-                if (process.waitFor() != 0) throw RuntimeException("影片切片異常")
+                if (process.waitFor() != 0) throw RuntimeException("[影片切片異常]")
                 // 刪除 keyInfo 檔案
                 Files.delete(keyInfo)
             } catch (e: IOException) {
-                throw IOException("File path is invalid : [audioTranscodeToM3U8]")
+                throw IOException("[File path is invalid]: [audioTranscodeToM3U8]")
             }
         }
 

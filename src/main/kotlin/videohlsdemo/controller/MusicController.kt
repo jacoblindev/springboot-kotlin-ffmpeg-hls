@@ -2,6 +2,7 @@ package videohlsdemo.controller
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -10,8 +11,10 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import videohlsdemo.model.MusicEntity
 import videohlsdemo.model.UploadReq
 import videohlsdemo.model.UploadRes
+import videohlsdemo.repository.MusicRepository
 import videohlsdemo.utility.FFmpegUtils
 import java.io.IOException
 import java.net.InetAddress
@@ -25,7 +28,7 @@ import java.time.format.DateTimeFormatter
 
 @RestController
 @RequestMapping("/audio")
-class MusicController {
+class MusicController(@Autowired val musicRepository: MusicRepository) {
     companion object {
         private val LOG: Logger = LoggerFactory.getLogger(MusicController::class.java)
     }
@@ -40,10 +43,46 @@ class MusicController {
 
     @PostMapping("/upload")
     fun musicUpload(formData: UploadReq): ResponseEntity<UploadRes> {
-        LOG.info("[Request]: ${formData.musicName}, ${formData.musicAuthor}, ${formData.musicType}, ${formData.musicDetail}")
-        LOG.info("[檔案資訊]：title={}, size={}", formData.musicFile.originalFilename, formData.musicFile.size)
-        val res = UploadRes("Music")
-        return ResponseEntity.ok().body(res)
+        LOG.info(
+            "[檔案資訊] Name: ${formData.musicName}, Author: ${formData.musicAuthor}, " +
+                    "Type: ${formData.musicType}, Detail: ${formData.musicDetail}, " +
+                    "FileTitle: ${formData.musicFile.originalFilename}, FileSize: ${formData.musicFile.size}"
+        )
+        // 組成暫存檔案位置 /var/folders/9v/p5_jl3bx47g9lp2y017mv2dc0000gn/T/domo.mp3
+        val tempFile: Path = tempDir.resolve(formData.musicFile.originalFilename!!)
+        val today = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
+        val title = formData.musicFile.originalFilename!!.substring(0, formData.musicFile.originalFilename!!.lastIndexOf("."))
+        val targetDir: Path = Paths.get(
+            audioFolder,
+            today,
+            title
+        )
+        try {
+            // 儲存檔案至暫存檔案位置
+            formData.musicFile.transferTo(tempFile)
+            if (Files.exists(targetDir)) throw IllegalArgumentException("[檔案已存在]: $targetDir")
+            Files.createDirectories(targetDir)
+            LOG.info("[開始轉檔]: TargetDir: $targetDir")
+            try {
+                FFmpegUtils.audioTranscodeToM3U8(tempFile, targetDir)
+            } catch (e: Exception) {
+                LOG.error("[轉碼異常]： ${e.message}")
+                return ResponseEntity(UploadRes("FAILED!"), HttpStatus.INTERNAL_SERVER_ERROR)
+            }
+            val ipAddress = InetAddress.getLocalHost().hostAddress
+
+            val musicEntity = MusicEntity(null,formData.musicName, formData.musicAuthor, formData.musicType, formData.musicDetail,
+                "http://$ipAddress:$serverPort/$today/$title/index.m3u8", 0)
+            musicRepository.save(musicEntity)
+
+            return ResponseEntity(UploadRes("SUCCESS"), HttpStatus.OK)
+
+        } catch (e: IOException) {
+            throw IOException("[ERROR]: 存檔時發生異常", e)
+        } finally {
+            // 最終刪除暫存檔案
+            Files.delete(tempFile)
+        }
     }
 
     @PostMapping
@@ -73,7 +112,7 @@ class MusicController {
             // 執行轉碼操作
             LOG.info("開始轉碼")
             try {
-                FFmpegUtils.audioTranscodeToM3U8(tempFile.toString(), targetFolder.toString())
+                FFmpegUtils.audioTranscodeToM3U8(tempFile, targetFolder)
             } catch (e: Exception) {
                 LOG.error("轉碼異常：{}", e.message)
                 val result: MutableMap<String, Any> = HashMap()
@@ -91,10 +130,10 @@ class MusicController {
             result["success"] = true
             result["data"] = audioInfo
 
-            val ipAddr: String
+            val ipAddress: String
             try {
-                ipAddr = InetAddress.getLocalHost().hostAddress
-                LOG.info("[HOSTNAME]: $ipAddr:$serverPort")
+                ipAddress = InetAddress.getLocalHost().hostAddress
+                LOG.info("[HOSTNAME]: $ipAddress:$serverPort")
             } catch (e: UnknownHostException) {
                 LOG.error("Unknown Host???")
             }

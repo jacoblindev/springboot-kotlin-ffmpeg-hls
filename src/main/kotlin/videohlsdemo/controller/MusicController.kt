@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import videohlsdemo.model.MusicEntity
 import videohlsdemo.model.UploadReq
-import videohlsdemo.model.UploadRes
 import videohlsdemo.repository.MusicRepository
 import videohlsdemo.utility.FFmpegUtils
 import java.io.IOException
@@ -24,7 +23,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
 
 @RestController
 @RequestMapping("/audio")
@@ -42,7 +40,7 @@ class MusicController(@Autowired val musicRepository: MusicRepository) {
     private val tempDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
 
     @PostMapping("/upload")
-    fun musicUpload(formData: UploadReq): ResponseEntity<UploadRes> {
+    fun musicUpload(formData: UploadReq): ResponseEntity<MusicEntity> {
         LOG.info(
             "[檔案資訊] Name: ${formData.musicName}, Author: ${formData.musicAuthor}, " +
                     "Type: ${formData.musicType}, Detail: ${formData.musicDetail}, " +
@@ -67,18 +65,24 @@ class MusicController(@Autowired val musicRepository: MusicRepository) {
                 FFmpegUtils.audioTranscodeToM3U8(tempFile, targetDir)
             } catch (e: Exception) {
                 LOG.error("[轉碼異常]： ${e.message}")
-                return ResponseEntity(UploadRes("FAILED!"), HttpStatus.INTERNAL_SERVER_ERROR)
+                throw Exception("[ERROR]: 轉碼時發生異常", e)
             }
             val ipAddress = InetAddress.getLocalHost().hostAddress
-
+            // TODO: 會有 CORS 的問題待處理？
             val musicEntity = MusicEntity(null,formData.musicName, formData.musicAuthor, formData.musicType, formData.musicDetail,
-                "http://$ipAddress:$serverPort/$today/$title/index.m3u8", 0)
+                "http://localhost:$serverPort/$today/$title/index.m3u8", 0)
+//            val musicEntity = MusicEntity(null,formData.musicName, formData.musicAuthor, formData.musicType, formData.musicDetail,
+//                "/$today/$title/index.m3u8", 0)
             musicRepository.save(musicEntity)
 
-            return ResponseEntity(UploadRes("SUCCESS"), HttpStatus.OK)
+            return ResponseEntity(musicEntity, HttpStatus.OK)
 
         } catch (e: IOException) {
+            LOG.error("[存檔異常]： ${e.message}")
             throw IOException("[ERROR]: 存檔時發生異常", e)
+        } catch (ex: Exception) {
+            LOG.error("[上傳失敗]： ${ex.message}")
+            return ResponseEntity.internalServerError().build()
         } finally {
             // 最終刪除暫存檔案
             Files.delete(tempFile)

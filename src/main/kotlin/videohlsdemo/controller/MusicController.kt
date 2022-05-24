@@ -70,7 +70,7 @@ class MusicController(@Autowired val musicRepository: MusicRepository) {
             val ipAddress = InetAddress.getLocalHost().hostAddress
             // TODO: 會有 CORS 的問題待處理？
             val musicEntity = MusicEntity(null,formData.musicName, formData.musicAuthor, formData.musicType, formData.musicDetail,
-                "http://localhost:$serverPort/$today/$title/index.m3u8", 0)
+                "http://$ipAddress:$serverPort/$today/$title/index.m3u8", 0)
 //            val musicEntity = MusicEntity(null,formData.musicName, formData.musicAuthor, formData.musicType, formData.musicDetail,
 //                "/$today/$title/index.m3u8", 0)
             musicRepository.save(musicEntity)

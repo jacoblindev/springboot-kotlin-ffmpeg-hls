@@ -34,9 +34,17 @@ function uploadMusic(e) {
                 document.getElementById('author-music').innerHTML = data.musicAuthor;
                 document.getElementById('type-music').innerHTML = data.musicType;
                 document.getElementById('detail-music').innerHTML = data.musicDetail;
-                var hls = new Hls();
-                hls.loadSource(data.musicUrl);
-                hls.attachMedia(audio);
+                document.getElementById('url-music').innerHTML = data.musicUrl;
+                document.getElementById('url-music').setAttribute('href', data.musicUrl);
+
+                if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+                    audio.setAttribute('src', data.musicUrl);
+                } else if (Hls.isSupported()) {
+                   var hls = new Hls();
+                   hls.loadSource(data.musicUrl.split(":8888")[1]);
+                   hls.attachMedia(audio);
+
+               }
             })
             .catch(err => {
             	alert("上傳失敗，詳情檢視控制檯");
